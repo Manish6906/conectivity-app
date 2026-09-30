@@ -13,6 +13,29 @@ export function AppProvider({ children }) {
   const [socket, setSocket] = useState(null);
   const [pending, setPending] = useState(0);
 
+  const playNotificationSound = useCallback((frequency = 780) => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+
+      const context = new AudioCtx();
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.type = "sine";
+      oscillator.frequency.value = frequency;
+      gain.gain.value = 0.05;
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.start();
+      const start = context.currentTime;
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.2);
+      oscillator.stop(start + 0.2);
+      setTimeout(() => context.close(), 220);
+    } catch {
+      // Ignore browser audio restrictions.
+    }
+  }, []);
+
   const logout = useCallback(() => {
     localStorage.removeItem("token");
     localStorage.removeItem("rememberedLogin");
@@ -23,8 +46,17 @@ export function AppProvider({ children }) {
   }, [navigate]);
 
   const refreshPending = useCallback(() => {
-    api.get("/friends/received").then((r) => setPending(r.data.requests.length)).catch(() => {});
-  }, []);
+    api
+      .get("/friends/received")
+      .then((r) => {
+        const next = r.data.requests.length;
+        setPending((prev) => {
+          if (next > prev && next > 0) playNotificationSound(640);
+          return next;
+        });
+      })
+      .catch(() => {});
+  }, [playNotificationSound]);
 
   useEffect(() => {
     if (user && user.isDeactivated && location.pathname !== "/profile") {

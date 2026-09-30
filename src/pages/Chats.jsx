@@ -112,23 +112,14 @@ export default function Chats() {
     });
   }, [activeId, socket]);
 
-  useEffect(() => {
-    if (!chat || chat.isGroup) {
-      setUserInfo(null);
-      return;
+  const openUserInfo = useCallback(async () => {
+    if (!chat || chat.isGroup || !meta?.other?._id) return;
+    try {
+      const { data } = await api.get(`/users/profile/${meta.other._id}`);
+      setUserInfo(data.user);
+    } catch {
+      setUserInfo({ ...meta.other, email: "", phone: "", bio: "", education: "" });
     }
-    const otherId = meta?.other?._id;
-    if (!otherId) {
-      setUserInfo(null);
-      return;
-    }
-    let alive = true;
-    api.get(`/users/profile/${otherId}`).then((r) => {
-      if (alive) setUserInfo(r.data.user);
-    }).catch(() => {
-      if (alive) setUserInfo({ ...meta.other, email: "", phone: "" });
-    });
-    return () => { alive = false; };
   }, [chat, meta?.other?._id]);
 
   // ---------- socket events ----------
@@ -359,7 +350,7 @@ export default function Chats() {
             <div className="h-16 bg-[#f0f2f5] px-3 md:px-4 flex items-center gap-3 shrink-0 relative">
               <button onClick={() => setActiveId(null)} className="md:hidden text-2xl text-gray-600 cursor-pointer">←</button>
               <div className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
-                onClick={() => !chat.isGroup && setUserInfo((p) => (p ? null : { ...meta.other }))}>
+                onClick={openUserInfo}>
                 <Avatar src={meta.pic} name={meta.name} size={42} online={!chat.isGroup && meta.other?.isOnline} />
                 <div className="min-w-0">
                   <p className="font-medium text-gray-900 truncate leading-tight">{meta.name}</p>

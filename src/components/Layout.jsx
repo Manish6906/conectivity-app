@@ -25,15 +25,8 @@ export default function Layout() {
   const visibleLinks = user?.isDeactivated ? [{ to: "/profile", icon: Settings, label: "Profile" }] : links;
 
   return (
-    <div className="h-dvh w-full max-w-[1500px] mx-auto flex flex-col-reverse md:flex-row bg-slate-100 rounded-none md:rounded-[28px] overflow-hidden shadow-[0_20px_60px_rgba(15,23,42,0.12)] border border-slate-200/80">
+    <div className="h-dvh w-full flex flex-col-reverse md:flex-row bg-slate-100 overflow-hidden">
       <nav className="flex md:flex-col items-center justify-around md:justify-start md:gap-2 bg-[#111b21] text-gray-300 md:w-24 px-2 py-2 md:py-4">
-        <div className="hidden md:flex mb-3 flex-col items-center gap-1 text-center">
-          <div className="h-10 w-10 items-center justify-center rounded-full bg-[#00a884] text-white shadow-lg flex">
-            <ArrowLeftRight className="h-5 w-5" />
-          </div>
-          <span className="text-[10px] font-semibold tracking-wide text-[#d7fff5]">Connectivity</span>
-        </div>
-
         {visibleLinks.map((l) => {
           const Icon = l.icon;
           return (
