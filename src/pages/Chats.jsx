@@ -34,6 +34,8 @@ export default function Chats() {
   const chatsRef = useRef([]);
   const bottomRef = useRef(null);
   const messagePanelRef = useRef(null);
+  const shouldStickToBottomRef = useRef(true);
+  const lastReadEmitRef = useRef({});
   const typingTimer = useRef(null);
   const isTypingRef = useRef(false);
   activeRef.current = activeId;
@@ -70,6 +72,7 @@ export default function Chats() {
 
   const chat = chats.find((c) => c._id === activeId);
   const meta = chat ? metaOf(chat, user._id) : null;
+  const msgs = messages[activeId] || [];
 
   // ---------- chats list ----------
   const loadChats = useCallback(async () => {
@@ -103,15 +106,25 @@ export default function Chats() {
     }
   }, [params, setParams, startDirect]);
 
+  const markChatRead = useCallback((chatId) => {
+    if (!chatId) return;
+    const now = Date.now();
+    const last = lastReadEmitRef.current[String(chatId)] || 0;
+    if (now - last < 1200) return;
+    lastReadEmitRef.current[String(chatId)] = now;
+    socket.emit("message:read", { chatId });
+  }, [socket]);
+
   // ---------- chat kholne par messages + read ----------
   useEffect(() => {
     if (!activeId) return;
+    shouldStickToBottomRef.current = true;
     api.get(`/chats/${activeId}/messages`).then((r) => {
       setMessages((p) => ({ ...p, [activeId]: r.data.messages }));
-      socket.emit("message:read", { chatId: activeId });
+      markChatRead(activeId);
       setChats((p) => p.map((c) => (c._id === activeId ? { ...c, unread: 0 } : c)));
     });
-  }, [activeId, socket]);
+  }, [activeId, markChatRead]);
 
   const openUserInfo = useCallback(async () => {
     if (!chat || chat.isGroup || !meta?.other?._id) return;
@@ -159,7 +172,7 @@ export default function Chats() {
           return [upd, ...p.filter((x) => x._id !== m.chat)];
         });
       }
-      if (!mine && isActive) socket.emit("message:read", { chatId: m.chat });
+      if (!mine && isActive) markChatRead(m.chat);
     };
 
     // tick update (delivered / seen)
@@ -186,7 +199,7 @@ export default function Chats() {
 
     const onVisible = () => {
       if (document.visibilityState === "visible" && activeRef.current) {
-        socket.emit("message:read", { chatId: activeRef.current });
+        markChatRead(activeRef.current);
         setChats((p) => p.map((c) => (c._id === activeRef.current ? { ...c, unread: 0 } : c)));
       }
     };
@@ -209,15 +222,39 @@ export default function Chats() {
       socket.off("friends:changed", loadChats);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [socket, user._id, loadChats, playIncomingMessageSound]);
+  }, [socket, user._id, loadChats, playIncomingMessageSound, markChatRead]);
 
   useEffect(() => {
-    if (!messagePanelRef.current) return;
-    const el = messagePanelRef.current;
+    const panel = messagePanelRef.current;
+    if (!panel) return;
+    const onScroll = () => {
+      const nearBottom = panel.scrollHeight - panel.scrollTop - panel.clientHeight < 160;
+      shouldStickToBottomRef.current = nearBottom;
+    };
+    panel.addEventListener("scroll", onScroll, { passive: true });
+    return () => panel.removeEventListener("scroll", onScroll);
+  }, [activeId]);
+
+  useEffect(() => {
+    const panel = messagePanelRef.current;
+    if (!panel) return;
+
+    const isNearBottom = panel.scrollHeight - panel.scrollTop - panel.clientHeight <= 160;
+    const isOwnMessage = msgs.length && msgs[msgs.length - 1]?.sender === user._id;
+    const shouldScroll = shouldStickToBottomRef.current || isOwnMessage;
+
+    if (!shouldScroll || (!isNearBottom && !shouldStickToBottomRef.current && !isOwnMessage)) {
+      return;
+    }
+
     requestAnimationFrame(() => {
-      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+      const current = messagePanelRef.current;
+      if (!current) return;
+      const stillNearBottom = current.scrollHeight - current.scrollTop - current.clientHeight <= 160;
+      if (!stillNearBottom && !shouldStickToBottomRef.current && !isOwnMessage) return;
+      current.scrollTo({ top: current.scrollHeight, behavior: "smooth" });
     });
-  }, [messages, activeId, typing]);
+  }, [messages, activeId, typing, user._id, msgs]);
 
   // ---------- send + typing ----------
   const stopTyping = () => {
@@ -259,7 +296,6 @@ export default function Chats() {
   };
 
   // ---------- render helpers ----------
-  const msgs = messages[activeId] || [];
   const filtered = chats.filter((c) =>
     metaOf(c, user._id).name.toLowerCase().includes(search.toLowerCase())
   );
