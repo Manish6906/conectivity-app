@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
@@ -21,9 +21,32 @@ function Register() {
     password: "",
   });
   const [otp, setOtp] = useState("");
+  const [otpExpiresAt, setOtpExpiresAt] = useState(null);
+  const [otpTimer, setOtpTimer] = useState("05:00");
   const [profile, setProfile] = useState({ bio: "", education: "" });
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(DEFAULT_PIC);
+
+  useEffect(() => {
+    if (!otpExpiresAt) return;
+
+    const updateTimer = () => {
+      const remaining = Math.max(0, otpExpiresAt - Date.now());
+      const minutes = Math.floor(remaining / 60000);
+      const seconds = Math.floor((remaining % 60000) / 1000);
+      setOtpTimer(`${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`);
+
+      if (remaining <= 0) {
+        setOtp("");
+        setOtpExpiresAt(null);
+        setError("OTP expire ho gaya hai. Naya OTP mangao.");
+      }
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [otpExpiresAt]);
 
   const handleChange = (e) =>
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -38,10 +61,12 @@ function Register() {
       setLoading(true);
       const { data } = await api.post("/auth/register", form);
       setEmailForOtp(data.email || form.email);
+      setOtpExpiresAt(Date.now() + 5 * 60 * 1000);
+      setOtp("");
       setStep(2);
-      setError(data.message || "OTP sent successfully");
+      setError(data.message || "OTP aapke email par bheja gaya hai.");
     } catch (err) {
-      setError(err.response?.data?.message || "Something went wrong");
+      setError(err.response?.data?.message || "Kuch galat hua.");
     } finally {
       setLoading(false);
     }
@@ -50,7 +75,7 @@ function Register() {
   const verifyOtpStep = async (e) => {
     e.preventDefault();
     setError("");
-    if (!otp.trim()) return setError("Please enter the OTP");
+    if (!otp.trim()) return setError("OTP enter karo.");
 
     try {
       setLoading(true);
@@ -58,7 +83,7 @@ function Register() {
       localStorage.setItem("token", data.token);
       setStep(3);
     } catch (err) {
-      setError(err.response?.data?.message || "OTP verification failed");
+      setError(err.response?.data?.message || "OTP verify karne me problem hui.");
     } finally {
       setLoading(false);
     }
@@ -68,7 +93,9 @@ function Register() {
     try {
       setLoading(true);
       const { data } = await api.post("/auth/resend-otp", { email: emailForOtp });
-      setError(data.message || "A new OTP has been sent");
+      setOtpExpiresAt(Date.now() + 5 * 60 * 1000);
+      setOtp("");
+      setError(data.message || "Naya OTP aapke email par bheja gaya hai.");
     } catch (err) {
       setError(err.response?.data?.message || "OTP resend failed");
     } finally {
@@ -168,17 +195,22 @@ function Register() {
 
       {step === 2 && (
         <form onSubmit={verifyOtpStep}>
-          <p>OTP sent to {emailForOtp}.</p>
+          <div className="otp-panel">
+            <p>OTP {emailForOtp} par bheja gaya hai.</p>
+            <p style={{ marginTop: 8, color: otpExpiresAt ? "#dc2626" : "#6b7280" }}>
+              Ye OTP 5 minute ke liye valid hai: <strong>{otpTimer}</strong>
+            </p>
+          </div>
           <input
             type="text"
             inputMode="numeric"
-            placeholder="Enter 6-digit OTP"
+            placeholder="6-digit OTP enter karo"
             value={otp}
             onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
             required
           />
-          <button disabled={loading}>{loading ? "Verifying..." : "Verify OTP"}</button>
-          <button type="button" onClick={resendOtp} disabled={loading}>Resend OTP</button>
+          <button disabled={loading || !!otpExpiresAt && otpTimer === "00:00"}>{loading ? "Verify ho raha hai..." : "OTP verify karo"}</button>
+          <button type="button" onClick={resendOtp} disabled={loading}>Naya OTP bhejo</button>
         </form>
       )}
 

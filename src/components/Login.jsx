@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import api from "../api";
 
@@ -7,8 +7,31 @@ function Login() {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({ email: "", password: "" });
   const [otp, setOtp] = useState("");
+  const [otpExpiresAt, setOtpExpiresAt] = useState(null);
+  const [otpTimer, setOtpTimer] = useState("05:00");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!otpExpiresAt) return;
+
+    const updateTimer = () => {
+      const remaining = Math.max(0, otpExpiresAt - Date.now());
+      const minutes = Math.floor(remaining / 60000);
+      const seconds = Math.floor((remaining % 60000) / 1000);
+      setOtpTimer(`${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`);
+
+      if (remaining <= 0) {
+        setOtp("");
+        setOtpExpiresAt(null);
+        setError("OTP expire ho gaya hai. Naya OTP mangao.");
+      }
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [otpExpiresAt]);
 
   const sendLoginOtp = async (e) => {
     e.preventDefault();
@@ -16,8 +39,10 @@ function Login() {
     try {
       setLoading(true);
       const { data } = await api.post("/auth/login/request-otp", form);
+      setOtpExpiresAt(Date.now() + 5 * 60 * 1000);
+      setOtp("");
       setStep(2);
-      setError(data.message || "OTP sent to your email");
+      setError(data.message || "OTP aapke email par bheja gaya hai.");
     } catch (err) {
       setError(err.response?.data?.message || "Login failed");
     } finally {
@@ -28,7 +53,7 @@ function Login() {
   const verifyLoginOtp = async (e) => {
     e.preventDefault();
     setError("");
-    if (!otp.trim()) return setError("Please enter the OTP");
+    if (!otp.trim()) return setError("OTP enter karo.");
 
     try {
       setLoading(true);
@@ -36,7 +61,7 @@ function Login() {
       localStorage.setItem("token", data.token);
       navigate("/");
     } catch (err) {
-      setError(err.response?.data?.message || "OTP verification failed");
+      setError(err.response?.data?.message || "OTP verify karne me problem hui.");
     } finally {
       setLoading(false);
     }
@@ -46,7 +71,9 @@ function Login() {
     try {
       setLoading(true);
       const { data } = await api.post("/auth/login/request-otp", form);
-      setError(data.message || "A new OTP has been sent");
+      setOtpExpiresAt(Date.now() + 5 * 60 * 1000);
+      setOtp("");
+      setError(data.message || "Naya OTP aapke email par bheja gaya hai.");
     } catch (err) {
       setError(err.response?.data?.message || "OTP resend failed");
     } finally {
@@ -83,21 +110,26 @@ function Login() {
 
       {step === 2 && (
         <form onSubmit={verifyLoginOtp}>
-          <p>OTP sent to {form.email}.</p>
+          <div className="otp-panel">
+            <p>OTP {form.email} par bheja gaya hai.</p>
+            <p style={{ marginTop: 8, color: otpExpiresAt ? "#dc2626" : "#6b7280" }}>
+              Ye OTP 5 minute ke liye valid hai: <strong>{otpTimer}</strong>
+            </p>
+          </div>
           <input
             type="text"
             inputMode="numeric"
-            placeholder="Enter 6-digit OTP"
+            placeholder="6-digit OTP enter karo"
             value={otp}
             onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
             required
           />
-          <button disabled={loading}>{loading ? "Verifying..." : "Verify OTP"}</button>
-          <button type="button" onClick={resendLoginOtp} disabled={loading}>Resend OTP</button>
+          <button disabled={loading || (!!otpExpiresAt && otpTimer === "00:00")}>{loading ? "Verify ho raha hai..." : "OTP verify karo"}</button>
+          <button type="button" onClick={resendLoginOtp} disabled={loading}>Naya OTP bhejo</button>
         </form>
       )}
 
-      <p>
+      <p className="pt-3">
         New user? <Link to="/register">Register</Link>
       </p>
     </div>
