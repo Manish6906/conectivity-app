@@ -21,10 +21,15 @@ body {
   font-family: Inter, "Segoe UI", sans-serif;
   background: linear-gradient(135deg, var(--bg-1), var(--bg-2));
   color: var(--text);
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
 }
 
 #root {
   min-height: 100vh;
+  width: 100%;
+  max-width: 1500px;
 }
 
 .auth-box {

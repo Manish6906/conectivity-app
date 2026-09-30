@@ -43,6 +43,30 @@ export default function Chats() {
     setTimeout(() => setErr(""), 3000);
   };
 
+  const playIncomingMessageSound = useCallback(() => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+
+      const context = new AudioCtx();
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.type = "triangle";
+      oscillator.frequency.value = 880;
+      gain.gain.value = 0.06;
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.start();
+      const now = context.currentTime;
+      gain.gain.setValueAtTime(0.06, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+      oscillator.stop(now + 0.18);
+      setTimeout(() => context.close(), 220);
+    } catch (error) {
+      // Ignore browser audio restrictions silently.
+    }
+  }, []);
+
   const chat = chats.find((c) => c._id === activeId);
   const meta = chat ? metaOf(chat, user._id) : null;
 
@@ -120,6 +144,8 @@ export default function Chats() {
       const isActive = activeRef.current === m.chat && document.visibilityState === "visible";
       const mine = m.sender === user._id;
 
+      if (!mine) playIncomingMessageSound();
+
       if (!chatsRef.current.some((c) => c._id === m.chat)) {
         loadChats();
       } else {
@@ -180,7 +206,7 @@ export default function Chats() {
       socket.off("friends:changed", loadChats);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [socket, user._id, loadChats]);
+  }, [socket, user._id, loadChats, playIncomingMessageSound]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
