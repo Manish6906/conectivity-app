@@ -33,6 +33,7 @@ export default function Chats() {
   const activeRef = useRef(null);
   const chatsRef = useRef([]);
   const bottomRef = useRef(null);
+  const messagePanelRef = useRef(null);
   const typingTimer = useRef(null);
   const isTypingRef = useRef(false);
   activeRef.current = activeId;
@@ -125,11 +126,19 @@ export default function Chats() {
   // ---------- socket events ----------
   useEffect(() => {
     const onNew = (m) => {
-      setMessages((p) =>
-        p[m.chat] && !p[m.chat].some((x) => x._id === m._id)
-          ? { ...p, [m.chat]: [...p[m.chat], m] }
-          : p
-      );
+      let duplicate = false;
+      setMessages((p) => {
+        const list = p[m.chat] || [];
+        if (list.some((x) => x._id === m._id)) {
+          duplicate = true;
+          return p;
+        }
+        return { ...p, [m.chat]: [...list, m] };
+      });
+      if (duplicate) {
+        setTyping((p) => ({ ...p, [m.chat]: null }));
+        return;
+      }
       setTyping((p) => ({ ...p, [m.chat]: null }));
 
       const isActive = activeRef.current === m.chat && document.visibilityState === "visible";
@@ -143,7 +152,10 @@ export default function Chats() {
         setChats((p) => {
           const c = p.find((x) => x._id === m.chat);
           if (!c) return p;
-          const upd = { ...c, lastMessage: m, unread: mine || isActive ? c.unread : c.unread + 1 };
+          const hasSameLastMessage = c.lastMessage?._id === m._id;
+          if (hasSameLastMessage) return p;
+          const unreadDelta = mine || isActive ? 0 : 1;
+          const upd = { ...c, lastMessage: m, unread: Math.max(0, c.unread + unreadDelta) };
           return [upd, ...p.filter((x) => x._id !== m.chat)];
         });
       }
@@ -200,7 +212,11 @@ export default function Chats() {
   }, [socket, user._id, loadChats, playIncomingMessageSound]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (!messagePanelRef.current) return;
+    const el = messagePanelRef.current;
+    requestAnimationFrame(() => {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    });
   }, [messages, activeId, typing]);
 
   // ---------- send + typing ----------
@@ -376,7 +392,7 @@ export default function Chats() {
             </div>
 
             {/* messages */}
-            <div className="flex-1 overflow-y-auto px-3 md:px-8 py-4 bg-[#efeae2]"
+            <div ref={messagePanelRef} className="flex-1 overflow-y-auto px-3 md:px-8 py-4 bg-[#efeae2]"
               style={{ backgroundImage: "radial-gradient(#d9d2c5 1px, transparent 1px)", backgroundSize: "18px 18px" }}
               onClick={() => setMenu(false)}>
               {msgs.length === 0 && (
