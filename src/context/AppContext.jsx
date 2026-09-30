@@ -37,13 +37,16 @@ export function AppProvider({ children }) {
   }, []);
 
   const logout = useCallback(() => {
+    if (socket) {
+      socket.emit("user:logout");
+    }
     localStorage.removeItem("token");
     localStorage.removeItem("rememberedLogin");
     disconnectSocket();
     setUser(null);
     setSocket(null);
     navigate("/login");
-  }, [navigate]);
+  }, [navigate, socket]);
 
   const refreshPending = useCallback(() => {
     api

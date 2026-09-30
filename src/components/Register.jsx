@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import api from "../api";
+import PasswordInput from "./PasswordInput";
 
 const DEFAULT_PIC = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
@@ -175,8 +176,7 @@ function Register() {
             <option value="other">Other</option>
           </select>
 
-          <input
-            type="password"
+          <PasswordInput
             name="password"
             placeholder="Password (min 6)"
             autoComplete="new-password"
@@ -184,6 +184,7 @@ function Register() {
             onChange={handleChange}
             minLength={6}
             required
+            className="px-3 py-2.5 pr-11 text-sm border border-[#dfe7f3] rounded-xl bg-[#f8fafc] text-slate-900 outline-none focus:border-[#2563eb] focus:shadow-[0_0_0_4px_rgba(37,99,235,0.12)]"
           />
 
           <button disabled={loading}>{loading ? "Wait..." : "Send OTP"}</button>

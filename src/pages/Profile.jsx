@@ -7,6 +7,7 @@ import api from "../api";
 import { useApp } from "../context/AppContext";
 import Avatar from "../components/Avatar";
 import Btn from "../components/Btn";
+import PasswordInput from "../components/PasswordInput";
 
 const inp =
   "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#00a884] bg-white";
@@ -256,10 +257,23 @@ export default function Profile() {
 
         <Card title="🔑 Change password">
           <form onSubmit={changePw} className="space-y-3">
-            <input type="password" autoComplete="current-password" className={inp} placeholder="Old password"
-              value={pw.oldPassword} onChange={(e) => setPw({ ...pw, oldPassword: e.target.value })} required />
-            <input type="password" autoComplete="new-password" className={inp} placeholder="New password (min 6)"
-              value={pw.newPassword} onChange={(e) => setPw({ ...pw, newPassword: e.target.value })} minLength={6} required />
+            <PasswordInput
+              autoComplete="current-password"
+              className={`${inp} pr-11`}
+              placeholder="Old password"
+              value={pw.oldPassword}
+              onChange={(e) => setPw({ ...pw, oldPassword: e.target.value })}
+              required
+            />
+            <PasswordInput
+              autoComplete="new-password"
+              className={`${inp} pr-11`}
+              placeholder="New password (min 6)"
+              value={pw.newPassword}
+              onChange={(e) => setPw({ ...pw, newPassword: e.target.value })}
+              minLength={6}
+              required
+            />
             <div className="flex items-center gap-3">
               <Btn>Update password</Btn>
               <span className="text-sm">{pwMsg}</span>
